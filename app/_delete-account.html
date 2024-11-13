@@ -1,0 +1,60 @@
+<template>
+    <main>
+        <h1>Delete Account</h1>
+
+        <form class="form" @submit.prevent="submit">
+            <section>
+                <button>Delete</button>
+                <button @click.prevent="$router.push('/')">Cancel</button>
+            </section>
+        </form>
+    </main>
+</template>
+
+<script>
+    app.component({
+        data: () => ({
+            
+        }),
+
+        methods: {
+            submit() {
+                this.$root.block();
+
+                const user = this.$root.user;
+
+                STORAGE
+                    .ref('photos')
+                    .child(user.uid + '.webp')
+                    .delete();
+
+                user
+                    .delete()
+                    .then(_ => {
+
+                        this.$root.unblock();
+                        this.$router.push('/');
+
+                        // TODO: Delete user
+                        USERS.doc(user.uid).delete();
+
+                    })
+                    .catch(err => {
+
+                        this.$root.unblock();
+                        handleError(err, this.$refs.email, this.$refs.password);
+
+                    });
+            },
+        },
+
+        created() {
+            if (!this.$root.user) {
+                this.$router.push('/sign-in');
+                return;
+            }
+
+            document.title = 'Firebase Chat : Delete Account';
+        },
+    });
+</script>

@@ -1,0 +1,37 @@
+<template>
+    <section>
+        <h2>Events</h2>
+        <div v-if="events.length">
+            <ul>
+                <li v-for="event in events" :key="event.id">
+                    <h3>{{ event.title }}</h3>
+                    <p>{{ event.date }}</p>
+                    <p>{{ event.description }}</p>
+                </li>
+            </ul>
+        </div>
+        <p v-else>No events available.</p>
+    </section>
+</template>
+
+<script>
+    export default {
+        data() {
+            return {
+                events: [],
+            };
+        },
+        async created() {
+            try {
+                const snapshot = await firebase.firestore().collection('events').get();
+                this.events = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            } catch (error) {
+                console.error("Error fetching events:", error);
+            }
+        },
+    };
+</script>
+
+<style scoped>
+    /* Optional styling */
+</style>

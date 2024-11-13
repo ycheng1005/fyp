@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Game Lobby</title>
+    <link href="image/favicon.png" rel="shortcut icon">
+    <link href="css/app.css" rel="stylesheet">
+    <style>
+        button {
+            font-size: 1.5em;
+            margin: 10px;
+            padding: 15px;
+            cursor: pointer;
+            width: 100%;
+            max-width: 400px;
+        }
+
+        .game-button-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .game-button-container button {
+            margin: 10px;
+            width: 100%;
+        }
+    </style>
+</head>
+
+<body>
+    <header>
+        <h1><a href="/">Game Lobby</a></h1>
+    </header>
+
+    <main>
+        <p>Select a game to join:</p>
+
+        <div class="game-button-container">
+            <!-- Game Buttons for each game -->
+            <button id="tictactoe">TicTacToe</button>
+            <button id="bingo">Bingo</button>
+            <button id="chess">Chess</button>
+            <button id="checkers">Checkers</button>
+            <!-- Add more games as needed -->
+        </div>
+    </main>
+
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/9.0.0/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.0.0/firebase-auth.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.7.1/jquery.slim.min.js"></script>
+
+    <script>
+        // ========================================================================================
+        // Firebase Configuration and Initialization
+        // ========================================================================================
+        const firebaseConfig = {
+            apiKey: 'AIzaSyAFDI6-LRsmFw-3HlYMyhJG10Pzg8xZn8M',
+            storageBucket: 'gs://tieo-202401.appspot.com',
+            projectId: 'tieo-202401',
+            databaseURL: 'https://tieo-202401-default-rtdb.asia-southeast1.firebasedatabase.app',
+        };
+        firebase.initializeApp(firebaseConfig);
+        const auth = firebase.auth();
+
+        // ========================================================================================
+        // General
+        // ========================================================================================
+
+        // Load logged-in user info if available
+        auth.onAuthStateChanged(user => {
+            if (user) {
+                const userIcon = user.photoURL || 'default-photo.png';
+                const userName = user.displayName || 'Anonymous';
+                sessionStorage.setItem('icon', userIcon);
+                sessionStorage.setItem('name', userName);
+            } else {
+                alert('Please log in to join a game');
+                location = '/login.html'; // Redirect to login page if not logged in
+            }
+        });
+
+        // ========================================================================================
+        // Event Handlers
+        // ========================================================================================
+
+        // Event listener for each game button
+        $('#tictactoe').click(function () {
+            sessionStorage.setItem('game', 'tictactoe');
+            location = 'tictactoe-room.html'; // Redirect to TicTacToe room
+        });
+
+        $('#bingo').click(function () {
+            sessionStorage.setItem('game', 'bingo');
+            location = 'bingo-room.html'; // Redirect to Bingo room
+        });
+
+        $('#chess').click(function () {
+            sessionStorage.setItem('game', 'chess');
+            location = 'chess-room.html'; // Redirect to Chess room
+        });
+
+        $('#checkers').click(function () {
+            sessionStorage.setItem('game', 'checkers');
+            location = 'checkers-room.html'; // Redirect to Checkers room
+        });
+
+        // Add more games here as needed...
+    </script>
+</body>
+
+</html>

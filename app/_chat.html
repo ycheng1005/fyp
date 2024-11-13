@@ -1,0 +1,777 @@
+<style>
+    :root {
+        display: grid;
+        grid: 'panel chat' 1fr 'panel form' auto / 200px auto;
+        gap: 5px;
+        overflow: auto;
+    }
+
+    #panel {
+        grid-area: panel;
+        display: flex;
+        flex-direction: column;
+        gap: 5px;
+    }
+
+    #panel>div {
+        display: flex;
+        align-items: center;
+        gap: 5px;
+    }
+
+    #chat {
+        grid-area: chat;
+        border: 1px solid #666;
+        display: flex;
+        flex-direction: column-reverse;
+        overflow-y: scroll;
+        padding: 5px;
+    }
+
+    #chat>section {
+        flex: 1;
+    }
+
+    #chat>div {
+        display: flex;
+        flex-direction: column;
+        gap: 5px;
+    }
+
+    .message {
+        display: flex;
+        gap: 5px;
+    }
+
+    .message>div {
+        border: 1px solid #666;
+        border-radius: 5px;
+        padding: 5px;
+        min-width: 70px;
+        max-width: 500px;
+
+        background: #ccf;
+    }
+
+    .me {
+        justify-content: right;
+    }
+
+    .me>div {
+        background: #cfc;
+    }
+
+    .me .photo,
+    .me small {
+        display: none;
+    }
+
+    time,
+    small {
+        display: block;
+        text-align: right;
+        font-size: small;
+        color: #666;
+    }
+
+    #form {
+        grid-area: form;
+        display: flex;
+    }
+
+    #text {
+        flex: 1;
+        padding: 5px;
+    }
+
+    .photo {
+        width: 30px;
+        height: 30px;
+        border: 1px solid #666;
+        border-radius: 50%;
+    }
+
+    .online-dot {
+        width: 10px;
+        height: 10px;
+        background-color: green;
+        border-radius: 50%;
+        margin-left: auto;
+    }
+
+    .offline-dot {
+        width: 10px;
+        height: 10px;
+        background-color: red;
+        border-radius: 50%;
+        margin-left: auto;
+    }
+
+    .dropdown {
+        position: relative;
+        display: inline-block;
+        padding: auto;
+        margin: auto;
+    }
+
+    .dropdown-menu {
+        display: none;
+        position: absolute;
+        background-color: #f9f9f9;
+        min-width: 50px;
+        max-height: 200px;
+        /* Limit the height to show only 5 items */
+        overflow-y: scroll;
+        /* Enable vertical scrolling */
+        box-shadow: 0px 8px 16px 0px rgba(0, 0, 0, 0.2);
+        z-index: 1;
+        bottom: 100%;
+    }
+
+    .dropdown-toggle {
+        width: 30px;
+        height: 30px;
+        padding: 0;
+        font-size: inherit;
+        line-height: normal;
+    }
+
+    .dropdown-menu .dropdown-item {
+        padding: auto;
+        text-decoration: none;
+        display: block;
+    }
+
+    .dropdown-menu .dropdown-item:hover {
+        background-color: #f1f1f1;
+    }
+
+    .dropdown:hover .dropdown-menu {
+        display: block;
+    }
+
+    .dropdown:hover .dropdown-toggle {
+        background-color: #3e8e41;
+    }
+
+    .image {
+        max-width: 200px;
+        max-height: 200px;
+        border: 1px solid #666;
+        display: block;
+        cursor: pointer;
+    }
+
+    .image:fullscreen {
+        object-fit: scale-down;
+        border: none !important;
+    }
+
+    .camera-modal {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        background: rgba(0, 0, 0, 0.8);
+        flex-direction: column;
+    }
+
+    .camera-modal video {
+        width: 80%;
+        max-width: 500px;
+        border: 2px solid #fff;
+    }
+
+    .camera-modal button {
+        margin-top: 10px;
+        padding: 10px;
+        background: #fff;
+        border: none;
+        cursor: pointer;
+    }
+</style>
+
+<template>
+    <main>
+        <!-- Panel ------------------------------------------------------------------------------->
+        <div id="panel">
+            <template v-for="u of users">
+                <!-- TODO -->
+                <div>
+                    <img class="photo" :src="u.photoURL">
+                    <span>{{ u.displayName }}</span>
+                    <span :class="{'online-dot': online[u.uid], 'offline-dot': !online[u.uid]}"></span>
+                </div>
+            </template>
+        </div>
+
+        <!-- Chat -------------------------------------------------------------------------------->
+        <div id="chat" @dragenter="handleDragEnter" @dragover="handleDragOver" @dragleave="handleDragLeave"
+            @drop="handleDrop">
+            <section></section>
+            <div>
+                <div class="message" v-for="m of messages" :class="{ me: m.uid == user.uid }">
+                    <!-- Photo -->
+                    <img class="photo" :src="getPhotoURL(m.uid)" :title="getDisplayName(m.uid)">
+
+                    <!-- Message -->
+                    <div>
+                        <small>{{ getDisplayName(m.uid) }}</small>
+
+                        <!-- Text -->
+                        <template v-if="m.type == 'text'">
+                            <div v-html="format(m.text)"></div>
+                        </template>
+
+                        <!-- Image -->
+                        <template v-if="m.type == 'image'">
+                            <img class="image" @click="fullscreen" :src="m.url">
+                        </template>
+
+                        <!-- File -->
+                        <template v-if="m.type == 'file'">
+                            <a :href="m.url" download>{{ m.filename }}</a>
+                        </template>
+
+                        <!-- YoutubeVideo -->
+                        <template v-if="getYouTubeId(m.text)">
+                            <!-- This is a YouTube video -->
+                            <iframe width="500" height="315"
+                                :src="'https://www.youtube.com/embed/' + getYouTubeId(m.text)" frameborder="0"
+                                allowfullscreen></iframe>
+                        </template>
+
+                        <!-- MP3 -->
+                        <template v-if="m.type == 'mp3'">
+                            <audio controls>
+                                <source :src="m.url" type="audio/mpeg" />
+                            </audio>
+                        </template>
+
+                        <!-- Timestamp -->
+                        <time>{{ m.timestamp?.toDate().toLocaleTimeString() ?? '...' }}</time>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Form -------------------------------------------------------------------------------->
+        <form id="form" autocomplete="off">
+            <input id="text" placeholder="Type or speak something..." v-model.trim="text" v-focus>
+            <button @click.prevent="send" :disabled="!text">Send</button>
+
+            <div class="dropdown" id="emojiDropdown">
+                <button class="dropdown-toggle" type="button" id="emojiDropdownButton" aria-haspopup="true"
+                    aria-expanded="false">
+                    😀
+                </button>
+                <div class="dropdown-menu" aria-labelledby="emojiDropdownButton">
+                    <button class="dropdown-item" v-for="emoji in emojis" :key="emoji" @click="selectEmoji(emoji)">{{
+                        emoji }}</button>
+                </div>
+            </div>
+
+            <button type="button" @click="openCamera">📷</button>
+
+            <button type="button" @click="$refs.image.click()">🖼️</button>
+            <input type="file" multiple hidden accept="image/*" ref="image" @change="imageChange">
+
+            <button type="button" @click="$refs.file.click()">📁</button>
+            <input type="file" multiple hidden ref="file" @change="fileChange">
+
+            <button type="button" @click="$refs.mp3Input.click()">🎵</button>
+            <input type="file" multiple hidden accept="audio/mpeg" ref="mp3Input" @change="handleMp3" />
+
+            <button type="button" @click="startListening">🎙️</button>
+
+            <button type="button" @click="takeScreenshot">🖥️</button>
+        </form>
+
+        <!-- Camera Modal ------------------------------------------------------------------------>
+        <div v-if="showCamera" class="camera-modal">
+            <video ref="video" autoplay></video>
+            <button @click="capturePhoto">Capture</button>
+            <button @click="closeCamera">Close</button>
+        </div>
+    </main>
+</template>
+
+<script>
+    let unsubUsers = null;
+    let unsubMessages = null;
+    let userRef = null;
+    let statusRef = null;
+    let onlineRef = null;
+
+    app.component({
+        data: () => ({
+            user: null,
+            users: [],
+            online: {},
+            text: '',
+            messages: [],
+            rudeWords: [],
+            emojis: ['😊', '🤗', '😁', '😆', '😀', '😂', '🤣', '🥲', '😥', '😎', '🤑', '👌', '👍', '❤', '🎮'],
+            showCamera: false,
+            lastMessageTimestamps: {},
+        }),
+
+        methods: {
+            async loadRudeWords() {
+                const response = await fetch('/rude_words.txt');
+                const text = await response.text();
+                this.rudeWords = text.split('\n').map(word => word.trim().toLowerCase());
+            },
+            containsRudeWords(text) {
+                const lowerText = text.toLowerCase();
+                return this.rudeWords.some(word => lowerText.includes(word));
+            },
+            fullscreen(e) {
+                document.fullscreenElement ?
+                    document.exitFullscreen() :
+                    e.target.requestFullscreen();
+            },
+            getPhotoURL(uid) {
+                // TODO: Get user's photoURL
+                return this.users.find(u => u.uid == uid)?.photoURL;
+            },
+            getDisplayName(uid) {
+                // TODO: Get user's displayName
+                return this.users.find(u => u.uid == uid)?.displayName;
+            },
+            getYouTubeId(message) {
+                try {
+                    const url = new URL(message);
+                    if (url.hostname == 'www.youtube.com' && url.pathname == '/watch') {
+                        return url.searchParams.get('v');
+                    }
+                } catch (error) {
+                    console.error('Error parsing YouTube URL:', error);
+                }
+                return null;
+            },
+            send() {
+                if (this.text) {
+                    const currentTime = Date.now();
+                    const userId = this.user.uid;
+                    const lastMessageTime = this.lastMessageTimestamps[userId] || 0;
+                    const spamThreshold = 3000;
+
+                    if (currentTime - lastMessageTime < spamThreshold) {
+                        alert('You are sending messages too quickly. Please wait a moment.');
+                        return;
+                    }
+
+                    if (this.containsRudeWords(this.text)) {
+                        alert('Your message contains inappropriate language.');
+                        return;
+                    }
+
+                    this.lastMessageTimestamps[userId] = currentTime;
+
+                    // TODO: Send text (type, text, uid, timestamp)
+                    MESSAGES.doc().set({
+                        type: 'text',
+                        text: this.text,
+                        uid: this.user.uid,
+                        timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+                    });
+                }
+                this.text = '';
+            },
+            handleDragEnter(event) {
+                event.preventDefault();
+                event.currentTarget.classList.add('active');
+            },
+            handleDragOver(event) {
+                event.preventDefault();
+            },
+            handleDragLeave(event) {
+                event.preventDefault();
+                event.currentTarget.classList.remove('active');
+            },
+            handleDrop(event) {
+                event.preventDefault();
+                event.currentTarget.classList.remove('active');
+                const files = event.dataTransfer.files;
+                this.sendFiles(files);
+            },
+
+            sendFiles(files) {
+                for (const file of files) {
+                    if (file.type.startsWith('image/')) {
+                        this.uploadImage(file);
+                    } else {
+                        this.uploadFile(file);
+                    }
+                }
+            },
+
+            uploadImage(file) {
+                fit(file, 1000, 1000, 'blob', 'image/webp').then(blob => {
+                    const doc = MESSAGES.doc();
+
+                    STORAGE.ref('files')
+                        .child(doc.id + '.webp')
+                        .put(blob)
+                        .then(snap => snap.ref.getDownloadURL())
+                        .then(url => {
+                            doc.set({
+                                type: 'image',
+                                url,
+                                uid: this.user.uid,
+                                timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+                            });
+                        });
+                });
+            },
+            uploadFile(file) {
+                const doc = MESSAGES.doc();
+                STORAGE.ref('files')
+                    .child(doc.id + '_' + file.name)
+                    .put(file)
+                    .then(snap => snap.ref.getDownloadURL())
+                    .then(url => {
+                        doc.set({
+                            type: 'file',
+                            url,
+                            filename: file.name,
+                            uid: this.user.uid,
+                            timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+                        });
+                    });
+            },
+            format(text) {
+                if (this.containsRudeWords(text)) {
+                    return '***'; // Replace text with a placeholder or handle it appropriately
+                }
+
+                // Format text (if any)
+                text = text
+                    .replaceAll(':)', '😊')
+                    .replaceAll(':(', '😒')
+                    .replaceAll('<3', '❤️');
+
+                text = $('<div>').text(text).html();
+
+                text = text.replace(
+                    /(https?:\/\/\S+)/gi,
+                    '<a href="$&" target="_blank">$&</a>'
+                );
+
+                text = text.
+                    replace(
+                        /(\*{2})(.*?)\1/g, '<b>$2</b>' // Bold text
+                    ).replace(
+                        /(_{1})(.*?)\1/g, '<u>$2</u>' // Underline text
+                    ).replace(
+                        /(\*|_{1})(.*?)\1/g, '<i>$2</i>' // Italic text
+                    );
+
+                return text;
+            },
+            imageChange(e) {
+                const files = e.target.files;
+
+                for (const f of files) {
+                    // TODO: Send image (type, url, uid, timestamp)
+                    fit(f, 1000, 1000, 'blob', 'image/webp')
+                        .then(blob => {
+                            const doc = MESSAGES.doc();
+
+                            STORAGE
+                                .ref('files')
+                                .child(doc.id + '.webp')
+                                .put(blob)
+                                .then(snap => snap.ref.getDownloadURL())
+                                .then(url => {
+                                    doc.set({
+                                        type: 'image',
+                                        url,
+                                        uid: this.user.uid,
+                                        timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+                                    });
+                                });
+                        });
+                }
+
+                e.target.value = '';
+            },
+            fileChange(e) {
+                const files = e.target.files;
+
+                for (const f of files) {
+                    // TODO: Send file (type, url, filename, uid, timestamp)
+                    const doc = MESSAGES.doc();
+                    const ext = f.name.split('.').pop();
+                    const metadata = {
+                        contentDisposition: `attachment; filename="${f.name}"`,
+                    };
+
+                    STORAGE
+                        .ref('files')
+                        .child(doc.id + '.' + ext)
+                        .put(f, metadata)
+                        .then(snap => snap.ref.getDownloadURL())
+                        .then(url => {
+                            doc.set({
+                                type: 'file',
+                                url,
+                                filename: f.name,
+                                uid: this.user.uid,
+                                timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+                            });
+                        });
+                }
+
+                e.target.value = '';
+            },
+            startListening() {
+                const recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
+                recognition.lang = 'en-US';
+
+                recognition.onresult = event => {
+                    const transcript = event.results[0][0].transcript;
+                    this.text = transcript;
+                };
+
+                recognition.start();
+            },
+            async takeScreenshot() {
+                try {
+                    const canvas = await html2canvas(document.body); // Capture the entire body
+
+                    // Convert canvas to Blob
+                    canvas.toBlob(async (blob) => {
+                        if (blob) {
+                            // Create a reference to the storage location
+                            const storageRef = firebase.storage().ref();
+                            const screenshotRef = storageRef.child(`screenshots/screenshot-${Date.now()}.png`);
+
+                            // Upload the screenshot blob to Firebase Storage
+                            try {
+                                const snapshot = await screenshotRef.put(blob);
+                                const downloadURL = await snapshot.ref.getDownloadURL();
+
+                                // Send the screenshot as a message
+                                await firebase.firestore().collection('messages').add({
+                                    type: 'image',
+                                    url: downloadURL,
+                                    uid: this.user.uid,
+                                    timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+                                });
+
+                                console.log('Screenshot uploaded and message sent.');
+                            } catch (error) {
+                                console.error('Error uploading screenshot:', error);
+                            }
+                        }
+                    }, 'image/png');
+                } catch (error) {
+                    console.error('Error taking screenshot:', error);
+                }
+            },
+            selectEmoji(emoji) {
+                this.text += emoji;
+            },
+            async openCamera() {
+                this.showCamera = true;
+                const constraints = { video: true };
+
+                try {
+                    const stream = await navigator.mediaDevices.getUserMedia(constraints);
+                    this.$refs.video.srcObject = stream;
+                } catch (error) {
+                    console.error("Error accessing webcam:", error);
+                    this.showCamera = false;
+                }
+            },
+            capturePhoto() {
+                const video = this.$refs.video;
+                const canvas = document.createElement('canvas');
+                canvas.width = video.videoWidth;
+                canvas.height = video.videoHeight;
+                const context = canvas.getContext('2d');
+                context.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+                canvas.toBlob(blob => {
+                    this.uploadImage(blob);
+                }, 'image/webp');
+
+                this.closeCamera();
+            },
+            closeCamera() {
+                this.showCamera = false;
+                const stream = this.$refs.video.srcObject;
+                const tracks = stream.getTracks();
+                tracks.forEach(track => track.stop());
+                this.$refs.video.srcObject = null;
+            },
+            uploadImage(blob) {
+                const doc = MESSAGES.doc();
+                STORAGE
+                    .ref('files')
+                    .child(doc.id + '.webp')
+                    .put(blob)
+                    .then(snap => snap.ref.getDownloadURL())
+                    .then(url => {
+                        doc.set({
+                            type: 'image',
+                            url,
+                            uid: this.user.uid,
+                            timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+                        });
+                    });
+            },
+            handleMp3(event) {
+                const files = event.target.files;
+                for (const file of files) {
+                    this.getMp3(file);
+                }
+                event.target.value = null;
+            },
+
+            getMp3(file) {
+                const re = /\.(mp3)$/i;
+                if (file && re.test(file.name)) {
+                    const dateTime = new Date();
+                    this.uploadMp3(file, dateTime);
+                }
+            },
+
+            async uploadMp3(file, dateTime) {
+                const doc = MESSAGES.doc();
+                const storageRef = firebase.storage().ref();
+                const mp3Ref = storageRef.child(`mp3s/${doc.id}-${file.name}`);
+
+                try {
+                    const snapshot = await mp3Ref.put(file);
+                    const downloadURL = await snapshot.ref.getDownloadURL();
+
+                    await doc.set({
+                        type: 'mp3',
+                        url: downloadURL,
+                        filename: file.name,
+                        uid: this.user.uid,
+                        timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+                    });
+
+                    console.log('MP3 uploaded and message sent.');
+                } catch (error) {
+                    console.error('Error uploading MP3:', error);
+                }
+            },
+        },
+
+        async created() {
+            // TODO: Wait for authentication state
+            function getUser() {
+                return new Promise(resolve => {
+                    const unsub = AUTH.onAuthStateChanged(user => {
+                        unsub();
+                        resolve(user);
+                    });
+                });
+            }
+
+            this.user = await getUser();
+
+            if (!this.user) {
+                this.$router.push('/sign-in');
+                return;
+            }
+
+            document.title = 'Firebase Chat : Chat';
+
+            // TODO: Firestore --> Handle users
+            unsubUsers = USERS
+                .orderBy('displayName')
+                .onSnapshot(snap => {
+                    this.users = [];
+                    snap.forEach(doc => {
+                        this.users.push({ uid: doc.id, ...doc.data() });
+                    });
+                });
+
+            // TODO: Realtime DB --> Handle online status
+            const db = firebase.database();
+            userRef = db.ref(this.user.uid);
+            statusRef = db.ref('.info/connected');
+            onlineRef = db.ref();
+
+            statusRef.on('value', snap => {
+                userRef.onDisconnect().remove();
+                userRef.set(true);
+            });
+
+            onlineRef.on('value', snap => {
+                this.online = snap.val();
+            });
+
+            // TODO: Firestore --> Handle messages
+            unsubMessages = MESSAGES
+                .orderBy('timestamp')
+                .limitToLast(5)
+                .onSnapshot(snap => {
+                    snap.docChanges().forEach(change => {
+                        const { type, doc, oldIndex, newIndex } = change;
+
+                        if (type == 'added') {
+                            console.log('added', oldIndex, newIndex);
+
+                            // TODO: Push message
+                            this.messages.push({ id: doc.id, ...doc.data() });
+                        }
+                        if (type == 'modified') {
+                            console.log('modified', oldIndex, newIndex);
+
+                            // TODO: Update timestamp
+                            const { timestamp } = doc.data();
+                            const m = this.messages.find(m => m.id == doc.id);
+                            m.timestamp = timestamp;
+                        }
+                        if (type == 'removed') {
+                            console.log('removed', oldIndex, newIndex);
+
+                            // TODO: Delete old messages
+                            const { timestamp, url } = doc.data();
+
+                            MESSAGES
+                                .where('timestamp', '<=', timestamp)
+                                .get()
+                                .then(snap => {
+                                    snap.forEach(doc => {
+                                        if (url) {
+                                            STORAGE.refFromURL(url).delete().catch(e => 0);
+                                        }
+                                        doc.ref.delete();
+                                    });
+                                });
+                        }
+                    })
+                });
+
+            await this.loadRudeWords();
+        },
+
+        mounted() {
+
+        },
+
+        unmounted() {
+            // Firestore
+            unsubUsers?.();
+            unsubMessages?.();
+
+            // Realtime DB
+            userRef?.remove();
+            userRef?.off();
+            statusRef?.off();
+            onlineRef?.off();
+        },
+    });
+</script>

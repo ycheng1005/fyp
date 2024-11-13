@@ -1,0 +1,145 @@
+<template>
+    <main>
+        <h1>Update Profile</h1>
+
+        <form class="form" @submit.prevent="submit">
+
+            <label>Name</label>
+            <input v-model.trim="name" type="text" required maxlength="100" ref="name" v-focus>
+
+            <label>Field of Study</label>
+            <select v-model="fieldOfStudy" required>
+                <option value="" disabled>Select Field of Study</option>
+                <option value="Accounting and finance">Accounting and finance</option>
+                <option value="Internet Technology">Internet Technology</option>
+                <option value="Marketing and sales">Marketing and sales</option>
+                <option value="Marketing">Marketing</option>
+                <option value="Arts and design">Arts and design</option>
+                <option value="Law">Law</option>
+            </select>
+
+            <label>Level of Studying</label>
+            <select v-model="levelOfStudying" required>
+                <option value="" disabled>Select Level of Studying</option>
+                <option value="Foundation">Foundation</option>
+                <option value="Diploma">Diploma</option>
+                <option value="Degree">Degree</option>
+                <option value="Master">Master</option>
+                <option value="PhD">PhD</option>
+            </select>
+
+            <label>Photo</label>
+            <input type="file" id="file" accept="image/*" @change="change" ref="file">
+
+            <br>
+            <label for="file">
+                <img class="photo" :src="src">
+            </label>
+
+            <section>
+                <button>Submit</button>
+                <button @click.prevent="reset">Reset</button>
+                <button @click.prevent="$router.push('/')">Cancel</button>
+            </section>
+        </form>
+    </main>
+</template>
+
+<script>
+    app.component({
+        data: () => ({
+            name: '',
+            fieldOfStudy: '',
+            levelOfStudying: '',
+            photo: null,
+        }),
+
+        computed: {
+            src() {
+                return this.photo ? URL.createObjectURL(this.photo) : this.$root.user.photoURL;
+            },
+        },
+
+        methods: {
+            change(e) {
+                const el = e.target;
+                const f = el.files[0];
+
+                el.setCustomValidity('');
+
+                if (!f) {
+                    this.photo = null;
+                    return;
+                }
+
+                crop(f, 150, 150, 'blob', 'image/webp')
+                    .then(blob => this.photo = blob)
+                    .catch(err => {
+                        this.photo = null;
+                        el.setCustomValidity('Invalid photo.');
+                    });
+            },
+            reset() {
+                this.name = this.$root.user.displayName;
+                this.fieldOfStudy = this.$root.user.fieldOfStudy || '';
+                this.levelOfStudying = this.$root.user.levelOfStudying || '';
+                this.photo = null;
+                this.$refs.file.value = '';
+                this.$refs.name.focus();
+            },
+            submit() {
+                this.$root.block();
+
+                const user = this.$root.user;
+
+                user.updateProfile({ displayName: this.name })
+                    .then(_ => {
+                        // TODO: Update displayName
+                        USERS.doc(user.uid).update({
+                            displayName: user.displayName,
+                            fieldOfStudy: this.fieldOfStudy,
+                            levelOfStudying: this.levelOfStudying,
+                        });
+                    });
+
+                if (this.photo) {
+                    STORAGE
+                        .ref('photos')
+                        .child(user.uid + '.webp')
+                        .put(this.photo)
+                        .then(snap => snap.ref.getDownloadURL())
+                        .then(url => user.updateProfile({ photoURL: url }))
+                        .then(_ => {
+                            // TODO: Update photoURL
+                            USERS.doc(user.uid).update({
+                                photoURL: user.photoURL,
+                            });
+                        });
+                }
+
+                if (this.userMarker) {
+                    this.userMarker.userData = {
+                        name: this.name,
+                        fieldOfStudy: this.fieldOfStudy,
+                        levelOfStudying: this.levelOfStudying
+                    };
+                }
+                this.$root.unblock();
+                this.$router.push('/');
+            },
+        },
+
+        created() {
+            if (!this.$root.user) {
+                this.$router.push('/sign-in');
+                return;
+            }
+
+            this.name = this.$root.user.displayName;
+            this.fieldOfStudy = this.$root.user.fieldOfStudy || '';
+            this.levelOfStudying = this.$root.user.levelOfStudying || '';
+
+            document.title = 'Firebase Chat : Update Profile';
+        },
+    });
+</script>

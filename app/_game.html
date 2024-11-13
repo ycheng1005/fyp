@@ -1,0 +1,863 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bingo Game</title>
+    <link href="image/favicon.png" rel="shortcut icon">
+    <link href="css/app.css" rel="stylesheet">
+    <style>
+        /* Dialog CSS */
+        #chat-box {
+            overflow-y: scroll;
+            display: flex;
+            flex-direction: column-reverse;
+        }
+
+        .image {
+            max-width: 200px;
+            max-height: 200px;
+            border: 1px solid #999;
+            cursor: pointer;
+        }
+
+        .image:fullscreen {
+            object-fit: scale-down !important;
+            border: none !important;
+            background: #000 !important;
+        }
+
+        .active {
+            outline: 5px dashed red;
+            outline-offset: -5px;
+        }
+
+        #dialog {
+            border: 1px solid #000;
+            border-radius: 5px;
+            padding: 5px;
+        }
+
+        #dialog::backdrop {
+            background: #0009;
+        }
+
+        #dialog form {
+            display: block;
+            text-align: right;
+            margin-bottom: 5px;
+        }
+
+        #flex-container #container-dialog {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 5px;
+        }
+
+        #flex-container #container-dialog .image {
+            width: 100px;
+            height: 100px;
+            object-fit: cover;
+        }
+
+        .me {
+            background-color: #CBD6E2;
+            border-radius: 10px;
+            /* Add border radius for rounded corners */
+            padding: 5px 10px;
+            /* Add padding for spacing */
+            margin-bottom: 5px;
+            /* Add margin bottom for spacing between messages */
+        }
+
+        /* Chat CSS */
+        #chat-messages-wrapper {
+            max-height: calc(100vh - 160px);
+            position: relative;
+            bottom: 10%;
+            /* Set the maximum height for the chat area */
+            overflow-y: auto;
+            /* Enable vertical scrolling */
+            display: flex;
+            flex-direction: column-reverse;
+            padding: 10px;
+        }
+
+        /* Game CSS */
+        #status {
+            text-align: center;
+            font-size: 2rem;
+        }
+
+        .container {
+            display: flex;
+        }
+    </style>
+</head>
+
+<body>
+    <header>
+        <h1><a href="/">Bingo Game</a></h1>
+        <div>👧🏻 = <b id="count">0</b></div>
+    </header>
+
+    <main class="grid-container">
+        <div class="grid-item">
+            <p><button id="leave">Leave</button></p>
+
+            <p id="status">Waiting another player...</p>
+
+            <div>
+                <div id="bingoCard">
+                    <!-- Bingo card will be displayed here -->
+                    <table id="bingoTable">
+                        <!-- Bingo card will be generated dynamically -->
+                    </table>
+                </div>
+            </div>
+
+        </div>
+
+        <div class="grid-item" id="chat-box">
+            <div id="chat-messages-wrapper">
+                <ul id="chat"></ul>
+            </div>
+        </div>
+    </main>
+
+    <footer id="chat-form">
+        <form autocomplete="off">
+            <input type="text" id="message" placeholder="Enter Message" autofocus>
+            <div class="dropdown" id="emojiDropdown">
+                <button class="dropdown-toggle" type="button" id="emojiDropdownButton" aria-haspopup="true"
+                    aria-expanded="false">
+                    Emoji
+                </button>
+                <div class="dropdown-menu" aria-labelledby="emojiDropdownButton">
+                    <button class="dropdown-item" type="button" onclick="selectEmoji('😊')">😊</button>
+                    <button class="dropdown-item" type="button" onclick="selectEmoji('🤗')">🤗</button>
+                    <button class="dropdown-item" type="button" onclick="selectEmoji('😁')">😁</button>
+                    <button class="dropdown-item" type="button" onclick="selectEmoji('😆')">😆</button>
+                    <button class="dropdown-item" type="button" onclick="selectEmoji('😀')">😀</button>
+                    <button class="dropdown-item" type="button" onclick="selectEmoji('😂')">😂</button>
+                    <button class="dropdown-item" type="button" onclick="selectEmoji('🤣')">🤣</button>
+                    <button class="dropdown-item" type="button" onclick="selectEmoji('🥲')">🥲</button>
+                    <button class="dropdown-item" type="button" onclick="selectEmoji('😥')">😥</button>
+                    <button class="dropdown-item" type="button" onclick="selectEmoji('😎')">😎</button>
+                    <button class="dropdown-item" type="button" onclick="selectEmoji('🤑')">🤑</button>
+                    <button class="dropdown-item" type="button" onclick="selectEmoji('👌')">👌</button>
+                    <button class="dropdown-item" type="button" onclick="selectEmoji('👍')">👍</button>
+                    <button class="dropdown-item" type="button" onclick="selectEmoji('❤')">❤</button>
+                    <button class="dropdown-item" type="button" onclick="selectEmoji('🎮')">🎮</button>
+                </div>
+            </div>
+            <button type="button" id="image">Image</button>
+            <button type="button" id="gallery">Gallery</button>
+            <div class="threedots">
+                <button class="three-dots">&#8942;</button>
+                <div class="action-button">
+                    <button id="startScreenCapture">Start Screen Capture</button>
+                    <input type="file" id="doc" accept=".pdf, .doc, .docx, .txt" hidden multiple>
+                    <button type="button" id="sendDocument">Send Document</button>
+                </div>
+            </div>
+            <input type="file" id="file" accept="image/*" hidden multiple>
+        </form>
+    </footer>
+
+    <dialog id="dialog">
+        <form method="dialog"><button>❌</button></form>
+        <div id="container-dialog"></div>
+    </dialog>
+
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.7.1/jquery.slim.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/microsoft-signalr/8.0.0/signalr.min.js"></script>
+    <script src="js/app.js"></script>
+    <script>
+        // ========================================================================================
+        // General
+        // ========================================================================================
+
+        const icon = sessionStorage.getItem('icon');
+        const name = sessionStorage.getItem('name');
+
+        if (!icon || !name) {
+            location = '/';
+            throw 'ERROR: Invalid icon or name';
+        }
+
+        const gameId = new URL(location).searchParams.get('gameId');
+
+        if (!gameId) {
+            location = 'list.html';
+            throw 'ERROR: Invalid game id';
+        }
+
+        let started = false;
+        let me = null; // A or B
+        const $status = $('#status');
+
+        // ========================================================================================
+        // Events
+        // ========================================================================================
+
+        $('#leave').click(e => {
+            location = 'list.html';
+        });
+
+        // General Functions for chat ====================
+        function getImageURL(message) {
+            const re = /\.(jpg|jpeg|png|webp|bmp|gif)$/i;
+            try {
+                const url = new URL(message);
+                if (re.test(url.pathname)) {
+                    return url.href;
+                }
+            }
+            catch {
+                // Do nothing
+            }
+            return null;
+        }
+
+        function getYouTubeId(message) {
+            try {
+                const url = new URL(message);
+                if (url.hostname == 'www.youtube.com' && url.pathname == '/watch') {
+                    return url.searchParams.get('v');
+                }
+            }
+            catch {
+                // Do nothing
+            }
+            return null;
+        }
+
+        function sendImages(files) {
+            for (const f of files) {
+                if (f && f.type.startsWith('image/')) {
+
+                    fit(f, 500, 500, 'dataURL', 'image/webp')
+                        .then(url => con.invoke('SendImage', name, url));
+                }
+            }
+        }
+
+        function selectEmoji(emoji) {
+            const messageInput = document.getElementById('message');
+            messageInput.value += emoji;
+        }
+
+        const previousMessages = [];
+        const maxDuplicates = 3;
+        const cooldownPeriod = 3000;
+        const maxMessages = 10;
+
+        function isSpamMessage(message) {
+            const duplicateCount = previousMessages.filter(prevMessage => prevMessage.message === message).length;
+            return duplicateCount >= maxDuplicates;
+        }
+
+        function addMessageToHistory(message) {
+            previousMessages.push({ message, timestamp: Date.now() });
+            if (previousMessages.length > maxMessages) {
+                previousMessages.shift();
+            }
+        }
+
+        function isInCooldown(message) {
+            const lastMessage = previousMessages[previousMessages.length - 1];
+            if (lastMessage && lastMessage.message === message) {
+                const currentTime = Date.now();
+                const elapsedTime = currentTime - lastMessage.timestamp;
+                return elapsedTime < cooldownPeriod;
+            }
+            return false;
+        }
+
+
+        function appendMessage(message) {
+            previousMessages.push(message);
+            if (previousMessages.length > maxMessages) {
+                previousMessages.shift();
+            }
+
+            $('#chat').empty();
+
+            for (const msg of previousMessages) {
+                $('#chat').append(`<li>${msg}</li>`);
+            }
+
+            $('#chat-messages-wrapper').scrollTop($('#chat-messages-wrapper')[0].scrollHeight);
+        }
+
+        let rudeWords = [];
+
+        function loadRudeWords() {
+            $.get("wwwroot/rude_words.txt", function (data) {
+                rudeWords = data.split('\n').map(word => word.trim().toLowerCase());
+            });
+        }
+
+        function containsRudeWords(message) {
+            const messageWords = message.toLowerCase().split(' ');
+            for (const word of messageWords) {
+                if (rudeWords.includes(word)) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        async function startScreenCapture() {
+            try {
+                const captureStream = await navigator.mediaDevices.getDisplayMedia();
+                const mediaRecorder = new MediaRecorder(captureStream);
+                const chunks = [];
+
+                mediaRecorder.ondataavailable = (event) => {
+                    if (event.data.size > 0) {
+                        chunks.push(event.data);
+                    }
+                };
+
+                mediaRecorder.onstop = () => {
+                    const capturedData = new Blob(chunks, { type: 'video/webm' });
+                    const reader = new FileReader();
+                    reader.readAsDataURL(capturedData);
+                    reader.onloadend = () => {
+                        const base64Data = reader.result;
+                        connection.invoke("SendCapturedScreen", base64Data);
+                    };
+                };
+
+                setTimeout(() => {
+                    mediaRecorder.stop();
+                }, 5000);
+
+                mediaRecorder.start();
+            } catch (error) {
+                console.error('Error capturing screen:', error);
+            }
+        }
+
+        async function sendDocument() {
+            const fileInput = document.getElementById("doc");
+            const files = fileInput.files;
+
+            if (files.length === 0) {
+                console.error('No file selected.');
+                return;
+            }
+
+            const file = files[0];
+            const reader = new FileReader();
+
+            reader.onload = function (e) {
+                const documentData = e.target.result;
+                const documentName = file.name;
+
+                con.invoke("SendDocument", name, documentName, documentData)
+                    .catch(error => console.error('Error sending document:', error));
+            };
+
+            reader.onerror = function (e) {
+                console.error('Error reading file:', e.target.error);
+            };
+
+            reader.readAsDataURL(file);
+        }
+
+
+        // ========================================================================================
+        // Game Events
+        // ========================================================================================
+
+        function generateRandomBingoCard() {
+            // Logic to generate an array of 25 unique random numbers within 1 to 25
+            let bingoCard = [];
+            while (bingoCard.length < 25) {
+                let randomNumber = Math.floor(Math.random() * 25) + 1;
+                if (!bingoCard.includes(randomNumber)) {
+                    bingoCard.push(randomNumber);
+                }
+            }
+            return bingoCard;
+        }
+
+        function sendBingoCardToHub(bingoCard) {
+            con.invoke("SendBingoCard", bingoCard);
+        }
+
+        function displayBingoCard(bingoCardData) {
+            const table = document.getElementById('bingoTable');
+            table.innerHTML = ''; // Clear existing table content
+
+            for (let i = 0; i < 5; i++) {
+                const row = table.insertRow();
+                for (let j = 0; j < 5; j++) {
+                    const cell = row.insertCell();
+                    const number = bingoCardData[i * 5 + j];
+                    cell.textContent = number;
+                }
+            }
+        }
+
+        function markNumberAsClicked(number) {
+            // Update UI to reflect marked number
+            const cells = document.querySelectorAll("td");
+            cells.forEach(cell => {
+                if (parseInt(cell.textContent) === number) {
+                    cell.classList.add("marked");
+                    cell.style.color = "red"; // Change font color to red
+                }
+            });
+        }
+
+        // Define a data structure to track clicked numbers for each player
+        const clickedNumbers = {
+            A: new Set(),
+            B: new Set()
+        };
+
+        // Update the click event handler
+        function cellClickHandler() {
+            const number = parseInt($(this).text());
+            if (started && !isNaN(number)) {
+                const currentPlayer = me; // Get the current player (A or B)
+                if (!clickedNumbers[currentPlayer].has(number)) { // Check if the number hasn't been clicked by the current player
+                    con.invoke("MarkNumber", currentPlayer, number); // Send the clicked number to the server
+                    clickedNumbers[currentPlayer].add(number); // Mark the number as clicked for the current player
+                }
+            }
+        }
+
+        // ========================================================================================
+        // Connect
+        // ========================================================================================
+
+        const param = $.param({ page: 'game', icon, name, gameId });
+
+        const con = new signalR.HubConnectionBuilder()
+            .withUrl('/hub?' + param)
+            .build();
+
+        con.onclose(err => {
+            alert('Disconnected');
+            location = '/';
+        });
+
+        con.on('Reject', () => {
+            location = 'list.html';
+        });
+
+        con.on('Ready', (letter, game) => {
+            // Request bingo card when ready
+            if (game.playerA) {
+                $('#nameA').text(game.playerA.name);
+                $('#A').text(game.playerA.icon).show();
+            }
+
+            if (game.playerB) {
+                $('#nameB').text(game.playerB.name);
+                $('#B').text(game.playerB.icon).show();
+            }
+
+            if (me == null) {
+                me = letter;
+                $('#' + me).addClass('me');
+            }
+
+            con.invoke('RequestBingoCard');
+        });
+
+        con.on('Left', letter => {
+            let id = setTimeout(() => location = 'list.html', 3000);
+            while (--id) clearTimeout(id);
+
+            started = false;
+            $status.text(`Player ${letter} left. You win!`);
+        });
+
+        con.on('Start', () => {
+            setTimeout(() => $status.text('Ready... 3'), 1000);
+            setTimeout(() => $status.text('Ready... 2'), 2000);
+            setTimeout(() => $status.text('Ready... 1'), 3000);
+            setTimeout(() => {
+                // $status.text('Press SPACE to run!');
+                $status.text('Choose Your Lucky Number!');
+                started = true;
+            }, 4000);
+        });
+
+        con.on('LineWin', (letter, bingoCard) => {
+            let linesCompletedByPlayer = {
+                A: 0,
+                B: 0
+            };
+
+            const markedNumbers = Array.from(clickedNumbers[player]);
+
+            for (const pattern of winningPatterns) {
+                const hasWinningLine = pattern.every(number => markedNumbers.includes(number));
+                if (hasWinningLine) {
+                    con.invoke('CheckLineWin', player, number);
+                    return true; // Winning line found
+                }
+            }
+
+            if (linesCompletedByPlayer > 0) {
+                $status.text(`Player ${player} has completed a line! Total lines completed: A - ${linesCompletedByPlayer.A}, B - ${linesCompletedByPlayer.B}`);
+            }
+            return false; // Player doesn't have a winning line
+        });
+
+        con.on("NumberMarked", function (letter, number) {
+            $status.text("Player " + letter + " marked number: " + number);
+            // Update UI to reflect marked number
+            const cells = document.querySelectorAll("td");
+            cells.forEach(cell => {
+                if (parseInt(cell.textContent) === number) {
+                    cell.classList.add("marked");
+                }
+            })
+        });
+
+        con.on('ReceiveBingoCard', bingoCard => {
+            displayBingoCard(bingoCard);
+        });
+
+
+        con.on('Win', letter => {
+            started = false;
+
+            if (me == letter) {
+                $status.text('You win!');
+            }
+            else {
+                $status.text('You lose!');
+            }
+
+            setTimeout(() => location = 'list.html', 3000);
+        });
+
+        // =================Chat Connection======================================
+        con.on('ReceiveText', (name, message, who) => {
+
+            const currentTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+            message = message
+                .replaceAll(':)', '😊')
+                .replaceAll(':(', '😒')
+                .replaceAll('<3', '❤️');
+
+            message = $('<div>').text(message).html();
+
+            message = message.replace(
+                /(https?:\/\/\S+)/gi,
+                '<a href="$&" target="_blank">$&</a>'
+            );
+
+            message = message.replace(
+                /(\*{2})(.*?)\1/g, '<b>$2</b>' // Bold text
+            ).replace(
+                /(_{2})(.*?)\1/g, '<u>$2</u>' // Underline text
+            ).replace(
+                /(\*|_{1})(.*?)\1/g, '<i>$2</i>' // Italic text
+            );
+
+            const messageWithTime = `
+                <li class="${who}">
+                    <div>
+                        <b>${name}:</b> ${message}
+                        <sub class="message-time">${currentTime}</sub>
+                    </div>
+                </li>`;
+
+            $('#chat').append(messageWithTime);
+
+            var encodedName = $("<div />").text(name).html();
+            var encodedMsg = $("<div />").text(message).html();
+            $("#messagesList").append("<li><strong>" + encodedName + "</strong>: " + encodedMsg + "</li>");
+
+            $('#chat-messages-wrapper').scrollTop($('#chat-messages-wrapper')[0].scrollHeight);
+
+        });
+
+        con.on('UpdateStatus', (count, status) => {
+            $('#count').text(count);
+
+            $('#chat').append(`
+                <li class="status">
+                    <div>
+                        ${status}
+                    </div>
+                </li>
+            `);
+        });
+
+        con.on('ReceiveEmoji', (name, emoji) => {
+            $('#chat').append(`
+                <li class="me">
+                    <div>
+                        <b>${name}:</b> ${emoji}
+                    </div>
+                </li>
+            `);
+        });
+
+        con.on('ReceiveImage', (name, url, who) => {
+            $('#chat').append(`
+                <li class="${who}">
+                    <div>
+                        <b>${name}</b> sent an image<br>
+                        <img src="${url}" class="image">
+                    </div>
+                </li>
+            `);
+        });
+
+        con.on('ReceiveYouTube', (name, id, who) => {
+            $('#chat').append(`
+                <li class="${who}">
+                    <div>
+                        <b>${name}</b> sent a video<br>
+                        <iframe width="400" height="300"
+                                src="https://www.youtube.com/embed/${id}"
+                                frameborder="0"
+                                allowfullscreen></iframe>
+                    </div>
+                </li>
+            `);
+        });
+
+        con.on("ReceiveCapturedScreen", function (base64Data) {
+            // Display the received screen data to users
+            const screenImg = document.createElement("img");
+            screenImg.src = base64Data;
+            document.getElementById("screenContainer").appendChild(screenImg);
+        });
+
+        con.on("ReceiveDocument", function (sender, documentName, documentData) {
+            console.log(`Received document from ${sender}: ${documentName}`);
+
+            // Example: Create a blob from the documentData byte array and create a download link
+            var blob = new Blob([documentData], { type: "application/octet-stream" });
+            var url = window.URL.createObjectURL(blob);
+            var link = doc.createElement("a");
+            link.href = url;
+            link.download = documentName;
+            doc.body.appendChild(link);
+            link.click();
+            doc.body.removeChild(link);
+        });
+
+        // Start ================================
+
+        con.start().then(main);
+
+        function main() {
+
+            const bingoCard = generateRandomBingoCard();
+            sendBingoCardToHub(bingoCard);
+
+            $('#bingoTable').on('click', 'td', function () {
+                if (started) {
+                    const number = parseInt($(this).text());
+                    if (!isNaN(number)) {
+                        const currentPlayer = me; // Get the current player (A or B)
+                        const cellIndex = $(this).index();
+                        const rowIndex = $(this).parent().index();
+                        const cellValue = parseInt($('#bingoTable tr').eq(rowIndex).find('td').eq(cellIndex).text());
+                        if (!clickedNumbers.A.has(cellValue) && !clickedNumbers.B.has(cellValue)) { // Check if the number hasn't been clicked by any player
+                            con.invoke("MarkNumber", currentPlayer, cellValue); // Send the clicked number to the server
+                            clickedNumbers[currentPlayer].add(cellValue); // Mark the number as clicked for the current player
+                        }
+                    }
+                }
+            });
+
+            $('#bingoTable').on('click', 'td', cellClickHandler);
+            con.on("NumberMarked", function (letter, number) {
+                console.log("Player " + letter + " marked number: " + number);
+                markNumberAsClicked(number);
+            });
+
+
+            // ========================Chat function===========================
+
+            $('footer form').submit(e => {
+                e.preventDefault();
+                const message = $('#message').val().trim();
+                if (message) {
+                    const url = getImageURL(message);
+                    const id = getYouTubeId(message);
+
+                    if (url) {
+                        con.invoke('SendImage', name, url);
+                    }
+                    else if (id) {
+                        con.invoke('SendYouTube', name, id);
+                    }
+
+                    if (isSpamMessage(message)) {
+                        alert("Your message is considered spam and cannot be sent.");
+                        return;
+                    }
+
+                    // Check if the user is still in cooldown period
+                    if (isInCooldown(message)) {
+                        alert("You cannot send the same message again so soon.");
+                        return;
+                    }
+
+                    if (containsRudeWords(message)) {
+                        alert("Your message contains rude words and cannot be sent.");
+                        return;
+                    }
+
+                    // If the message is not considered spam, add it to the list of previous messages
+                    addMessageToHistory(message);
+
+
+                    con.invoke('SendText', name, message);
+                }
+
+                $('#message').val('').focus();
+            });
+
+            $(document).ready(function () {
+                loadRudeWords();
+            });
+
+            // Fullscreen
+            $(document).on('click', '.image', e => {
+                document.fullscreenElement ?
+                    document.exitFullscreen() :
+                    e.target.requestFullscreen();
+            });
+
+            $('#emojiDropdownButton').click(() => {
+                $('#emojiDropdown .dropdown-menu').toggleClass('show');
+            });
+
+            $(document).click((event) => {
+                if (!$(event.target).closest('#emojiDropdown').length) {
+                    $('#emojiDropdown .dropdown-menu').removeClass('show');
+                }
+            });
+
+            // File picker
+            $('#image').click(e => $('#file').click());
+
+            $('#file').change(e => {
+                const files = e.target.files;
+                sendImages(files);
+                e.target.value = null;
+            });
+
+            // TODO: Drag and drop
+            $('#chat-box').on('dragenter dragover', e => {
+                e.preventDefault();
+                $('#chat-box').addClass('active');
+            });
+
+            $('#chat-box').on('dragleave drop', e => {
+                e.preventDefault();
+                $('#chat-box').removeClass('active');
+            });
+
+            $('#chat-box').on('drop', e => {
+                e.preventDefault();
+                const files = e.originalEvent.dataTransfer.files;
+                sendImages(files);
+            });
+
+            // TODO: Dialog
+            $('#gallery').click(e => {
+                const $images = $('.image').clone();
+                $('#container-dialog').append($images.length ? $images : 'No image');
+                $('#dialog')[0].showModal();
+            });
+
+            $('#dialog').on('close', e => {
+                $('#container-dialog').empty();
+            });
+
+            $('#chat-messages-wrapper').on('scroll', function () {
+                if ($(this).scrollTop() === 0 && loadedMessagesCount < 50) {
+                    const oldestMessageId = $('#chat li:first').attr('id'); /* Get the ID of the oldest message currently displayed */
+                    const numberOfMessagesToLoad = 10;
+                    var xhr = new XMLHttpRequest();
+                    xhr.open('GET', '/Chat/GetOlderMessages?oldestMessageId=' + oldestMessageId + '&numberOfMessagesToLoad=' + numberOfMessagesToLoad, true);
+
+                    xhr.onload = function () {
+                        if (xhr.status >= 200 && xhr.status < 300) {
+                            var response = xhr.responseText;
+                            appendOlderMessages(response);
+                        } else {
+                            console.error('Error fetching older messages:', xhr.statusText);
+                        }
+                    };
+
+                    xhr.onerror = function () {
+                        console.error('Error fetching older messages:', xhr.statusText);
+                    };
+
+                    xhr.send();
+                }
+            });
+
+            $('#startScreenCapture').click(e => {
+                if (e.target.id === 'startScreenCapture') {
+                    startScreenCapture();
+                }
+            });
+
+            $('#doc').click(e => $('#file').click());
+
+            $('#file').change(e => {
+                const files = e.target.files;
+                sendImages(files);
+                e.target.value = null;
+            });
+
+            // $('#sendDocument').click(async (e) => {
+            //     // Assuming you have an input element for file selection with id="document"
+            //     const fileInput = document.getElementById("doc");
+            //     const file = fileInput.files[0]; // Get the selected file
+
+            //     if (!file) {
+            //         console.error("No file selected.");
+            //         return;
+            //     }
+
+            //     const reader = new FileReader();
+            //     reader.onload = async (event) => {
+            //         try {
+            //             const arrayBuffer = event.target.result;
+            //             const uint8Array = new Uint8Array(arrayBuffer);
+            //             const base64Data = btoa(String.fromCharCode.apply(null, uint8Array));
+
+            //             // Get the file name
+            //             const documentName = file.name;
+
+            //             // Invoke the SendDocument function on the server
+            //             await con.invoke("SendDocument", "sender", documentName, base64Data);
+            //             console.log("Document sent successfully.");
+            //         } catch (error) {
+            //             console.error("Error sending document:", error);
+            //         }
+            //     };
+
+            //     // Read the selected file as ArrayBuffer
+            //     reader.readAsArrayBuffer(file);
+            // });
+        }
+
+    </script>
+</body>
+
+</html>

@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="shortcut icon" href="image/favicon.png">
+    <link rel="stylesheet" href="css/app.css">
+    <title>Firebase Chat</title>
+</head>
+
+<body>
+    <div id="app" v-cloak>
+        <header>
+            <h1><a href="/">Firebase Chat</a></h1>
+            <div v-if="user">
+                {{ user.displayName }}<br>
+                {{ user.email }}<br>
+            </div>
+            <img :src="user.photoURL || 'image/photo.png'" v-if="user">
+        </header>
+
+        <nav>
+            <a href="#/home">Home</a>
+            <template v-if="user">
+                <a href="#/chat">Chat</a>
+                <a href="#/event">Event</a>
+                <a href="#/mini-games">Mini-Games</a>
+            </template>
+            <div></div>
+            <template v-if="user">
+                <a href="#/sign-in?page=/update-password">Update Password</a>
+                <a href="#/update-profile">Update Profile</a>
+                <a href="#/sign-in?page=/delete-account">Delete Account</a>
+                <a href="#" @click.prevent="signOut">Sign Out</a>
+            </template>
+            <template v-else>
+                <a href="#/register">Register</a>
+                <a href="#/reset-password">Reset Password</a>
+                <a href="#/sign-in">Sign In</a>
+            </template>
+        </nav>
+
+        <router-view v-slot="{ Component }">
+            <transition name="slide" mode="out-in" appear>
+                <component :is="Component">
+            </transition>
+        </router-view>
+
+        <dialog id="loader" ref="loader">
+            <img src="image/loader.gif">
+        </dialog>
+    </div>
+
+    <script
+        src="https://maps.googleapis.com/maps/api/js?key=AIzaSyCBdwinhBxfD7cqHUCw9ja3vCwrUoSFsro&libraries=geometry,drawing"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/10.11.0/firebase-app-compat.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/10.11.0/firebase-auth-compat.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/10.11.0/firebase-storage-compat.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/10.11.0/firebase-firestore-compat.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/10.11.0/firebase-database-compat.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/vue/3.4.25/vue.global.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/vue-router/4.3.2/vue-router.global.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.7.1/jquery.slim.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/@microsoft/signalr/7.0.0/signalr.min.js"></script>
+    <script src="js/app.js"></script>
+    <script>
+        // Firebase -----------------------------------------------------------
+
+        const gm = google.maps;
+        const center = new gm.LatLng(3.215600, 101.728100); // [OR] { lat: 3.215600, lng: 101.728100 }
+        let map = null;
+
+        // TODO
+        firebase.initializeApp({
+            apiKey: 'AIzaSyAFDI6-LRsmFw-3HlYMyhJG10Pzg8xZn8M',
+            storageBucket: 'gs://tieo-202401.appspot.com',
+            projectId: 'tieo-202401',
+            databaseURL: 'https://tieo-202401-default-rtdb.asia-southeast1.firebasedatabase.app',
+        });
+
+        const AUTH = firebase.auth();
+        const STORAGE = firebase.storage();
+        // TODO: [users] + [messages] collections
+        const USERS = firebase.firestore().collection('users');
+        const MESSAGES = firebase.firestore().collection('messages');
+        const EVENTS = firebase.firestore().collection('events');
+
+        // Setup firebase firestore
+        const DB = firebase.firestore();
+        const MARKERS = DB.collection('markers');
+        let unsubscribe = null;
+
+        // Vue router ---------------------------------------------------------
+        const router = VueRouter.createRouter({
+            history: VueRouter.createWebHashHistory(),
+            routes: [
+                { path: '/home', component: load('home') },
+                { path: '/chat', component: load('chat') },
+                { path: '/register', component: load('register') },
+                { path: '/reset-password', component: load('reset-password') },
+                { path: '/sign-in', component: load('sign-in') },
+                { path: '/update-password', component: load('update-password') },
+                { path: '/update-profile', component: load('update-profile') },
+                { path: '/delete-account', component: load('delete-account') },
+                { path: '/event', component: load('event') },
+                { path: '/mini-games', component: load('mini-games') },
+                { path: '/:all(.*)', redirect: '/home' },
+            ],
+        });
+
+        // Vue root component -------------------------------------------------
+        const app = Vue.createApp({
+            data: () => ({
+                user: null,
+            }),
+
+            methods: {
+                block() {
+                    this.$refs.loader.showModal();
+                },
+                unblock() {
+                    this.$refs.loader.close();
+                },
+                signOut() {
+                    AUTH.signOut();
+                    this.$router.push('/');
+                },
+            },
+
+            created() {
+                AUTH.onAuthStateChanged(user => this.user = user);
+            },
+        });
+
+        app.directive('focus', {
+            mounted(el) {
+                el.focus();
+            },
+        });
+
+        app.use(router);
+
+        const root = app.mount('#app');
+    </script>
+</body>
+
+</html>

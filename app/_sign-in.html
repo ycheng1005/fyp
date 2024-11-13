@@ -1,0 +1,76 @@
+<template>
+    <main>
+        <h1>Sign In</h1>
+
+        <form class="form" 
+              @submit.prevent="submit" 
+              @input="$event.target.setCustomValidity('')">
+
+            <label>Email</label>
+            <input v-model.trim="email"
+                   type="email"
+                   required
+                   maxlength="100"
+                   ref="email"
+                   v-focus>
+
+            <label>Password</label>
+            <input v-model.trim="password"
+                   type="password"
+                   required
+                   maxlength="100"
+                   ref="password">
+
+            <section>
+                <button>Submit</button>
+                <button @click.prevent="reset">Reset</button>
+                <button @click.prevent="$router.push('/')">Cancel</button>
+            </section>
+        </form>
+    </main>
+</template>
+
+<script>
+    app.component({
+        data: () => ({ 
+            email: '',
+            password: '',
+        }),
+
+        methods: {
+            reset() {
+                this.email = '';
+                this.password = '';
+                this.$refs.email.focus();
+            },
+            submit() { 
+                this.$root.block();
+
+                const page = this.$route.query.page;
+
+                AUTH
+                    .signInWithEmailAndPassword(this.email, this.password)
+                    .then(credential => {
+
+                        if (page) {
+                            this.$root.user = credential.user;
+                        }
+
+                        this.$root.unblock();
+                        this.$router.push(page || '/');
+
+                    })
+                    .catch(err => {
+
+                        this.$root.unblock();
+                        handleError(err, this.$refs.email, this.$refs.password);
+
+                    });
+            },
+        },
+
+        created() {
+            document.title = 'Firebase Chat : Sign In';
+        },
+    });
+</script>

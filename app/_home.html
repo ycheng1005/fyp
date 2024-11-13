@@ -1,0 +1,315 @@
+<style>
+    :root {
+        display: grid;
+        grid: 'panel map' auto 'items map' 1fr / 250px 1fr;
+        gap: 10px;
+        overflow: auto;
+    }
+
+    #panel {
+        grid-area: panel;
+    }
+
+    #map {
+        grid-area: map;
+        border: 1px solid #333;
+    }
+
+    #items {
+        grid-area: items;
+        overflow-y: scroll;
+
+        display: flex;
+        flex-direction: column;
+        gap: 3px;
+    }
+
+    .item {
+        display: grid;
+        grid: 'image label' auto 'image coord' auto / auto 1fr;
+        gap: 3px;
+
+        border: 1px solid #666;
+        border-radius: 3px;
+        padding: 3px;
+        cursor: pointer;
+        position: relative;
+    }
+
+    .item:hover {
+        background-color: #ccc;
+    }
+
+    .item input {
+        position: absolute;
+        top: 50%;
+        right: 2px;
+        transform: translate(0, -50%);
+        width: 24px;
+        height: 24px;
+        display: none;
+    }
+
+    .item:hover input {
+        display: block;
+    }
+
+    .item img {
+        grid-area: image;
+        border: 1px solid #666;
+        width: 40px;
+        height: 40px;
+    }
+
+    .item b {
+        grid-area: label;
+        background: #666;
+        color: #fff;
+        padding: 2px 4px;
+
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .item small {
+        grid-area: coord;
+    }
+
+    form img {
+        display: block;
+        border: 1px solid #999;
+        width: 100px;
+        height: 100px;
+        cursor: pointer;
+    }
+
+    /* TODO(8): Style marker label */
+    /* Use !important for --> color, font-family, font-size, font-weight */
+    .label {
+        color: #fff !important;
+        font-family: 'Roboto' !important;
+        font-size: 16px !important;
+        font-weight: bold !important;
+        background: #0009;
+        padding: 2px 4px;
+        margin-top: -50px;
+    }
+
+    /* TODO(22): Style marker icon */
+    [src$='#icon'] {
+        box-sizing: border-box;
+        border: 2px solid #333 !important;
+        border-radius: 50%;
+    }
+</style>
+
+<template>
+    <main>
+        <div id="panel">
+            {{ markers.length }} marker(s)
+        </div>
+
+        <div id="items">
+            <div class="item" v-for="m of markers" @click="panTo(m)">
+                <img :src="m.photoURL">
+                <b>{{ m.label.text }}</b>
+                <small>
+                    {{ m.position.lat().toFixed(3) }},
+                    {{ m.position.lng().toFixed(3) }}
+                </small>
+            </div>
+        </div>
+
+        <div id="map"></div>
+
+        <template>
+            <form id="info" class="form" @submit.prevent="save">
+                <label>Name</label>
+                <input v-model.trim="text" required maxlength="100" v-focus>
+
+                <label>Photo</label>
+                <div>
+                    <label>
+                        <input type="file" hidden @change="change">
+                        <img :src="photo">
+                    </label>
+                </div>
+
+                <section>
+                    <button v-if="isCurrentUser">Save</button>
+                    <button @click.prevent="cancel">Cancel</button>
+                </section>
+            </form>
+        </template>
+    </main>
+</template>
+
+<script>
+    app.component({
+        data: () => ({
+            markers: [],
+            info: null,
+            id: '',
+            text: '',
+            photo: '',
+            fieldOfStudy: '',
+            levelOfStudy: '',
+            user: null, // Current authenticated user
+            isCurrentUser: false, // Flag to check if the current user owns the profile
+        }),
+
+        methods: {
+            addMarker(id, data) {
+                const { displayName, location, photoURL, fieldOfStudy, levelOfStudy, userId } = data;
+                console.log(data);
+                const position = new gm.LatLng(location.lat, location.lng);
+                const m = new gm.Marker({
+                    map,
+                    animation: gm.Animation.DROP,
+                    draggable: false,
+                    id, // Custom
+                    position,
+                    label: { text: displayName, className: 'label' },
+                    photoURL, // Custom
+                    icon: { url: photoURL + '#icon', scaledSize: new gm.Size(50, 50) },
+                });
+                m.fieldOfStudy = fieldOfStudy; // Custom
+                m.levelOfStudy = levelOfStudy;
+                m.userId = userId;
+
+                this.markers.push(m);
+
+                m.addListener('position_changed', e => {
+                    this.$forceUpdate();
+                });
+
+                m.addListener('click', e => {
+                    this.id = m.id;
+                    this.text = m.label.text;
+                    this.photo = m.photoURL;
+                    this.displayName = m.label.displayName;
+                    this.photoURL = m.photoURL;
+                    this.fieldOfStudy = m.fieldOfStudy;
+                    this.levelOfStudy = m.levelOfStudy;
+                    this.isCurrentUser = m.userId === this.user.uid;
+                    this.info.open(map, m);
+                });
+            },
+            cancel() {
+                this.info.close();
+            },
+            change(e) {
+                const f = e.target.files[0];
+                crop(f, 100, 100, 'dataURL', 'image/webp')
+                    .then(dataURL => this.photoURL = dataURL);
+                e.target.value = '';
+            },
+            save() {
+                if (this.isCurrentUser) {
+                    USERS.doc(this.id).update({
+                        displayName: this.displayName,
+                        photoURL: this.photoURL,
+                        fieldOfStudy: this.fieldOfStudy,
+                        levelOfStudy: this.levelOfStudy,
+                    });
+                    this.info.close();
+                } else {
+                    alert("You are not authorized to edit this profile.");
+                }
+            },
+            panTo(m) {
+                map.panTo(m.getPosition());
+                m.setAnimation(gm.Animation.BOUNCE);
+                setTimeout(() => m.setAnimation(null), 3000);
+
+                gm.event.trigger(m, 'click');
+            },
+            getCurrentUser() {
+                // Firebase Authentication listener
+                firebase.auth().onAuthStateChanged(user => {
+                    if (user) {
+                        this.user = user;
+                        this.getCurrentLocation(); // Call this method after setting the user
+                    } else {
+                        // Redirect to login or show message
+                        console.log('User is not authenticated');
+                    }
+                });
+            }
+        },
+
+        created() {
+            this.$root.title = 'Studdy Buddy Finder';
+
+            // Firebase listener
+            unsubscribe = USERS?.onSnapshot(snap => {
+                snap.docChanges().forEach(change => {
+                    const { type, doc } = change;
+                    const data = doc.data();
+
+                    if (type == 'added') {
+                        this.addMarker(doc.id, data);
+
+                    } else if (type == 'modified') {
+                        const m = this.markers.find(u => u.id == doc.id);
+                        if (m) {
+                            const { displayName, location, photoURL, fieldOfStudy, levelOfStudy, userId } = data;
+                            m.setOptions({
+                                position: new gm.LatLng(location.lat, location.lng),
+                                label: { displayName, className: 'label' },
+                                photoURL,
+                                icon: { url: photoURL + '#icon', scaledSize: new gm.Size(50, 50) },
+                            });
+                            m.fieldOfStudy = fieldOfStudy;
+                            m.levelOfStudy = levelOfStudy;
+                            m.userId = userId;
+                        }
+                    }
+                });
+            });
+
+            this.getCurrentUser();
+        },
+
+        mounted() {
+            map = new gm.Map($('#map')[0], {
+                center, // Default center
+                zoom: 16,
+                disableDefaultUI: true,
+                clickableIcons: false,
+                disableDoubleClickZoom: true,
+                styles: [
+                    { featureType: 'poi', stylers: [{ visibility: 'off' }] },
+                    { featureType: 'transit', stylers: [{ visibility: 'off' }] },
+                ],
+            });
+
+            map.addListener('dblclick', e => {
+                USERS.doc().set({
+                    location: e.latLng.toJSON(),
+                    displayName: 'Untitled',
+                    photoURL: 'image/photo.png',
+                    fieldOfStudy: '',
+                    levelOfStudy: '',
+                    userId: this.user.uid
+                });
+            });
+
+            map.addListener('click', e => {
+                this.info.close();
+            });
+
+            this.info = new gm.InfoWindow({
+                content: $('#info')[0],
+            });
+
+            // this.getCurrentLocation();
+        },
+
+        unmounted() {
+            map = null;
+            unsubscribe?.();
+        },
+    });
+</script>
